@@ -5,7 +5,7 @@
       제품명 레이블 포함하여 FAISS DB 구축에 활용
 
 실행 :
-    pip install icrawler
+    pip install requests python-dotenv
     cd AI/
     python image_recognition/src/collect_images.py
 
@@ -27,13 +27,21 @@
         ├── SEVENTEEN_2025_SEASONS_GREETINGS/          (목표 25장)
         └── SEVENTEEN_2026_SEASONS_GREETINGS/          (목표 25장)
 
-    image_recognition/data/product_labels.json ← 제품명 레이블 매핑
+    image_recognition/data/product_labels.json <- 제품명 레이블 매핑
 """
 
 import json
+import os
 import time
 from pathlib import Path
-from icrawler.builtin import BingImageCrawler
+
+import requests
+from dotenv import load_dotenv
+
+# ── 환경변수 로드 ─────────────────────────────────────
+load_dotenv(Path(__file__).resolve().parent / ".env")
+API_KEY = os.environ["GOOGLE_API_KEY"]
+CX      = os.environ["GOOGLE_CX"]
 
 # ── 경로 설정 ─────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent  # image_recognition/
@@ -41,8 +49,6 @@ RAW_DIR  = BASE_DIR / "data" / "raw"
 RAW_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── 제품 목록 ─────────────────────────────────────────
-# queries: 제품명 그대로 + 한국어명 그대로만 사용
-# "photocard", "official" 등 불필요한 단어 제거
 PRODUCTS = [
 
     # ── BTS (방탄소년단) ───────────────────────────────
@@ -157,7 +163,57 @@ PRODUCTS = [
 ]
 
 
-# ── 수집 함수 ─────────────────────────────────────────
+# ── Google Custom Search API 이미지 URL 검색 ──────────
+def search_images(query: str, num: int) -> list:
+    urls = []
+    for start in range(1, num + 1, 10):
+        batch = min(10, num - len(urls))
+        if batch <= 0:
+            break
+        try:
+            res = requests.get(
+                "https://www.googleapis.com/customsearch/v1",
+                params={
+                    "key"       : API_KEY,
+                    "cx"        : CX,
+                    "q"         : query,
+                    "searchType": "image",
+                    "num"       : batch,
+                    "start"     : start,
+                },
+                timeout=10,
+            )
+            res.raise_for_status()
+            for item in res.json().get("items", []):
+                urls.append(item["link"])
+        except Exception as e:
+            print(f"    ⚠️  검색 오류: {e}")
+            break
+        time.sleep(0.5)
+    return urls
+
+
+# ── 이미지 다운로드 ───────────────────────────────────
+def download_image(url: str, path: Path) -> bool:
+    try:
+        res = requests.get(
+            url,
+            timeout=10,
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        res.raise_for_status()
+        path.write_bytes(res.content)
+        return True
+    except Exception:
+        return False
+
+
+def count_images(directory: Path) -> int:
+    return sum(len(list(directory.glob(f"*.{ext}")))
+               for ext in ["jpg", "jpeg", "png", "webp"])
+
+
+# ── 제품별 수집 ───────────────────────────────────────
 def collect_product(product: dict) -> int:
     group       = product["group"]
     folder_name = product["folder_name"]
@@ -174,51 +230,42 @@ def collect_product(product: dict) -> int:
     print(f"  목표 {target}장 | 쿼리 {len(queries)}개 | 쿼리당 최대 {per_query}장")
 
     for i, query in enumerate(queries, 1):
-        current = sum(len(list(save_dir.glob(f"*.{ext}")))
-                      for ext in ["jpg", "jpeg", "png"])
+        current = count_images(save_dir)
         if current >= target:
-            print(f"  ✅ 목표 달성 ({current}장) — 나머지 쿼리 스킵")
+            print(f"  목표 달성 ({current}장) — 나머지 쿼리 스킵")
             break
 
-        remaining = target - current
-        num = min(per_query, remaining)
+        num = min(per_query, target - current)
+        print(f"  [{i}/{len(queries)}] \"{query}\" -> {num}장 시도")
 
-        print(f"  [{i}/{len(queries)}] \"{query}\" → {num}장 시도")
+        urls = search_images(query, num)
+        downloaded = 0
+        for url in urls:
+            ext = url.split(".")[-1].split("?")[0][:4].lower()
+            if ext not in ("jpg", "jpeg", "png", "webp"):
+                ext = "jpg"
+            idx = count_images(save_dir)
+            if download_image(url, save_dir / f"{idx:04d}.{ext}"):
+                downloaded += 1
 
-        try:
-            crawler = BingImageCrawler(
-                storage={"root_dir": str(save_dir)},
-                log_level=40,
-            )
-            crawler.crawl(
-                keyword=query,
-                max_num=num,
-                file_idx_offset="auto",
-            )
-        except Exception as e:
-            print(f"  ⚠️  오류: {e}")
+        print(f"    -> {downloaded}장 다운로드")
+        time.sleep(1)
 
-        time.sleep(2)
-
-    final = sum(len(list(save_dir.glob(f"*.{ext}")))
-                for ext in ["jpg", "jpeg", "png"])
-    print(f"  → 최종 수집: {final}장 / 목표 {target}장")
+    final = count_images(save_dir)
+    print(f"  -> 최종: {final}장 / 목표 {target}장")
     return final
 
 
 # ── 레이블 JSON 저장 ──────────────────────────────────
 def save_labels():
     labels = {
-        p["folder_name"]: {
-            "group"  : p["group"],
-            "product": p["product"],
-        }
+        p["folder_name"]: {"group": p["group"], "product": p["product"]}
         for p in PRODUCTS
     }
     label_path = BASE_DIR / "data" / "product_labels.json"
     with open(label_path, "w", encoding="utf-8") as f:
         json.dump(labels, f, ensure_ascii=False, indent=2)
-    print(f"\n  레이블 저장 완료 → {label_path}")
+    print(f"  레이블 저장 -> {label_path}")
 
 
 # ── 메인 ─────────────────────────────────────────────
@@ -247,17 +294,16 @@ def main():
             "collected": count,
             "target"   : product["target"],
         }
-        time.sleep(3)
+        time.sleep(2)
 
-    # 최종 요약
     print(f"\n{'='*55}")
     print("수집 완료 요약")
     print(f"{'='*55}")
     total = 0
-    for folder, result in summary.items():
-        status = "✅" if result["collected"] >= result["target"] else "⚠️ "
-        print(f"  {status} {result['product']:<50} "
-            f"{result['collected']:>3}장 / {result['target']}장")
+    for result in summary.values():
+        status = "OK" if result["collected"] >= result["target"] else "NG"
+        print(f"  [{status}] {result['product']:<50} "
+              f"{result['collected']:>3}장 / {result['target']}장")
         total += result["collected"]
     print(f"\n  총 수집: {total}장")
     print(f"  저장 위치: {RAW_DIR.resolve()}")
