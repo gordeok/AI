@@ -2,8 +2,9 @@
 .env
 *.env
 
-# 수집 이미지 데이터
+# 수집/전처리 이미지 데이터
 image_recognition/data/raw/
+image_recognition/data/processed/
 
 # Python
 __pycache__/
