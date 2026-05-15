@@ -80,6 +80,7 @@ def augment(img: Image.Image, idx: int) -> Image.Image:
         left  = random.randint(0, w - new_w)
         top   = random.randint(0, h - new_h)
         img   = img.crop((left, top, left + new_w, top + new_h))
+        img   = img.resize((IMG_SIZE, IMG_SIZE), Image.LANCZOS)
 
     return img
 
