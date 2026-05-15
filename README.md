@@ -7,11 +7,14 @@
 
 ## Commit 규칙
 
-* feat : 기능 추가
-* fix : 버그 수정
-* design : UI/UX 변경
-* refactor : 코드 개선
-* docs : 문서 수정
+- [ ] feat: 기능 추가
+- [ ] fix: 버그 수정
+- [ ] docs: 문서 수정
+- [ ] refactor: 코드 개선
+- [ ] design: UI/UX 변경
+- [ ] chore: 설정 및 기타 작업
+- [ ] data: 데이터 수집 / 전처리
+- [ ] model: 모델 학습 / 추론 / 테스트
 
 예시:
 
