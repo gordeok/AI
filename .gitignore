@@ -6,6 +6,9 @@
 image_recognition/data/raw/
 image_recognition/data/processed/
 
+# 학습된 모델 가중치
+image_recognition/models/
+
 # Python
 __pycache__/
 *.pyc
