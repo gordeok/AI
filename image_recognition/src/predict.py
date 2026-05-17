@@ -12,7 +12,7 @@ import torch.nn as nn
 from torchvision import models, transforms
 from PIL import Image
 
-BASE_DIR  = Path(__file__).resolve().parent.parent
+BASE_DIR  = Path(r"C:\gordeok-AI\image_recognition")
 MODEL_DIR = BASE_DIR / "models"
 
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
@@ -58,7 +58,8 @@ def predict(img_path: str):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("usage: python image_recognition/src/predict.py <image_path>")
-        sys.exit(1)
-    predict(sys.argv[1])
+    # VSCode Run 버튼으로 실행 시 여기 경로를 수정하세요
+    DEFAULT_IMAGE = r"C:\gordeok-AI\test2.png"
+
+    img_path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_IMAGE
+    predict(img_path)
