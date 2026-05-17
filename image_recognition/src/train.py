@@ -27,6 +27,7 @@ from PIL import Image
 # ── 경로 ──────────────────────────────────────────────
 BASE_DIR      = Path(__file__).resolve().parent.parent
 PROCESSED_DIR = BASE_DIR / "data" / "processed"
+RAW_DIR       = BASE_DIR / "data" / "raw"
 MODEL_DIR     = BASE_DIR / "models"
 MODEL_DIR.mkdir(exist_ok=True)
 
@@ -60,34 +61,52 @@ class ProductDataset(Dataset):
         return img, label
 
 
-def build_samples(root: Path):
-    """processed/ 아래 제품 폴더를 클래스로 매핑해 (path, label) 목록 반환."""
+def build_samples(processed_root: Path, raw_root: Path):
+    """processed/ 아래 제품 폴더를 클래스로 매핑.
+    각 파일이 어떤 원본 이미지에서 파생됐는지(source_idx)도 함께 반환."""
     classes = sorted(
         d.name
-        for group in root.iterdir() if group.is_dir()
-        for d in group.iterdir()    if d.is_dir()
+        for group in processed_root.iterdir() if group.is_dir()
+        for d in group.iterdir()              if d.is_dir()
     )
     class_to_idx = {c: i for i, c in enumerate(classes)}
 
+    EXTS = {".jpg", ".jpeg", ".png", ".webp"}
+    # (path, label, product_key, source_original_idx)
     samples = []
-    for group in root.iterdir():
+    for group in processed_root.iterdir():
         if not group.is_dir():
             continue
         for product in group.iterdir():
             if not product.is_dir():
                 continue
             label = class_to_idx[product.name]
+            n_orig = len([f for f in (raw_root / group.name / product.name).iterdir()
+                          if f.suffix.lower() in EXTS])
             for img_path in sorted(product.glob("*.png")):
-                samples.append((img_path, label))
+                file_idx  = int(img_path.stem)
+                source    = file_idx if file_idx < n_orig else (file_idx - n_orig) % n_orig
+                samples.append((img_path, label, product.name, source))
 
     return samples, classes, class_to_idx
 
 
 def split_samples(samples: list, val_ratio: float, seed: int):
-    idx = list(range(len(samples)))
-    random.Random(seed).shuffle(idx)
-    n_val = int(len(idx) * val_ratio)
-    return [samples[i] for i in idx[n_val:]], [samples[i] for i in idx[:n_val]]
+    """원본 이미지 단위로 분할해 데이터 누수 방지."""
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for path, label, product, source in samples:
+        groups[(product, source)].append((path, label))
+
+    group_keys = sorted(groups.keys())
+    random.Random(seed).shuffle(group_keys)
+    n_val = max(1, int(len(group_keys) * val_ratio))
+    val_keys = set(group_keys[:n_val])
+
+    train_s, val_s = [], []
+    for key, items in groups.items():
+        (val_s if key in val_keys else train_s).extend(items)
+    return train_s, val_s
 
 
 # ── 학습/검증 한 epoch ────────────────────────────────
@@ -118,7 +137,7 @@ def main():
     print(f"device: {device}\n")
 
     # 데이터 준비
-    samples, classes, class_to_idx = build_samples(PROCESSED_DIR)
+    samples, classes, class_to_idx = build_samples(PROCESSED_DIR, RAW_DIR)
     print(f"클래스 {len(classes)}개  |  전체 {len(samples)}장")
     for i, c in enumerate(classes):
         print(f"  {i:2d}. {c}")
@@ -155,7 +174,7 @@ def main():
 
     # ── Phase 1: 백본 고정, 헤드만 학습 ──────────────
     print(f"\n{'='*55}")
-    print(f"Phase 1 — 헤드 학습  ({EPOCHS_HEAD} epochs, lr={LR_HEAD})")
+    print(f"Phase 1 -- 헤드 학습  ({EPOCHS_HEAD} epochs, lr={LR_HEAD})")
     print(f"{'='*55}")
 
     for param in model.features.parameters():
@@ -179,7 +198,7 @@ def main():
 
     # ── Phase 2: 전체 파인튜닝 ────────────────────────
     print(f"\n{'='*55}")
-    print(f"Phase 2 — 전체 파인튜닝  ({EPOCHS_FULL} epochs, lr={LR_FULL})")
+    print(f"Phase 2 -- 전체 파인튜닝  ({EPOCHS_FULL} epochs, lr={LR_FULL})")
     print(f"{'='*55}")
 
     for param in model.parameters():
