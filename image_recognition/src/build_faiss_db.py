@@ -12,8 +12,12 @@ FAISS DB 구축
     python image_recognition/src/build_faiss_db.py
 """
 
+import sys
+import io
 import json
 from pathlib import Path
+
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 import numpy as np
 import torch

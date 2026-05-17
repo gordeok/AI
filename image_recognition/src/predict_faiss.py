@@ -9,8 +9,11 @@ Stage 2 : FAISS 유사도  -> 제품명 1개 반환
 """
 
 import sys
+import io
 import json
 from pathlib import Path
+
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 import numpy as np
 import torch
