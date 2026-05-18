@@ -42,6 +42,10 @@ PATTERNS: list[tuple[str, str]] = [
         "현금 직거래 유도",
         r"(현금\s*으로\s*직접|직접\s*만나서\s*현금|현금\s*거래|현금\s*만\s*받)",
     ),
+    (
+        "협박성 입금 압박",
+        r"(빨리\s*입금|당장\s*입금|지금\s*바로\s*입금|돈\s*날린|오류\s*생긴|취소\s*되기\s*전에\s*입금|입금\s*안\s*하면\s*취소|빨리\s*보내\s*주)",
+    ),
 ]
 
 _COMPILED = [(name, re.compile(pattern, re.IGNORECASE)) for name, pattern in PATTERNS]
