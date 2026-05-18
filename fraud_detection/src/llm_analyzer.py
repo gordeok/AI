@@ -12,6 +12,8 @@ OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL_NAME   = "exaone3.5:2.4b"
 TIMEOUT      = 30
 WINDOW_SIZE  = 20  # LLM에 넘길 최근 메시지 수
+TEMPERATURE  = 0.1  # 낮을수록 일관된 JSON 출력
+TOP_P        = 0.9
 
 SYSTEM_PROMPT = """너는 K-pop 분철 거래 사기 탐지 AI야.
 아래 대화를 분석하고 JSON만 반환해. 다른 말은 절대 하지 마.
@@ -112,6 +114,7 @@ def analyze(messages: list[dict]) -> LLMResult:
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user",   "content": user_content},
                 ],
+                "options": {"temperature": TEMPERATURE, "top_p": TOP_P},
                 "stream": False,
             },
             timeout=TIMEOUT,
