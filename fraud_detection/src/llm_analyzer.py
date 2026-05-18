@@ -9,8 +9,9 @@ import httpx
 from dataclasses import dataclass
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL_NAME = "exaone3.5:2.4b"
-TIMEOUT    = 30
+MODEL_NAME   = "exaone3.5:2.4b"
+TIMEOUT      = 30
+WINDOW_SIZE  = 20  # LLM에 넘길 최근 메시지 수
 
 SYSTEM_PROMPT = """너는 K-pop 분철 거래 사기 탐지 AI야.
 아래 대화를 분석하고 JSON만 반환해. 다른 말은 절대 하지 마.
@@ -65,7 +66,8 @@ class LLMResult:
 
 
 def _build_conversation(messages: list[dict]) -> str:
-    return "\n".join(f"[{m.get('role', '?')}] {m.get('content', '')}" for m in messages)
+    window = messages[-WINDOW_SIZE:]
+    return "\n".join(f"[{m.get('role', '?')}] {m.get('content', '')}" for m in window)
 
 
 def _parse(text: str) -> LLMResult:
