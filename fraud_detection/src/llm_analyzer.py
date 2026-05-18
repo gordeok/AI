@@ -8,7 +8,7 @@ import json
 import httpx
 from dataclasses import dataclass
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
+OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL_NAME   = "exaone3.5:2.4b"
 TIMEOUT      = 30
 WINDOW_SIZE  = 20  # LLM에 넘길 최근 메시지 수
@@ -102,15 +102,22 @@ def _parse(text: str) -> LLMResult:
 
 
 def analyze(messages: list[dict]) -> LLMResult:
-    prompt = f"{SYSTEM_PROMPT}\n\n[대화]\n{_build_conversation(messages)}"
+    user_content = f"[대화]\n{_build_conversation(messages)}"
     try:
         res = httpx.post(
             OLLAMA_URL,
-            json={"model": MODEL_NAME, "prompt": prompt, "stream": False},
+            json={
+                "model": MODEL_NAME,
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user",   "content": user_content},
+                ],
+                "stream": False,
+            },
             timeout=TIMEOUT,
         )
         res.raise_for_status()
-        return _parse(res.json().get("response", ""))
+        return _parse(res.json().get("message", {}).get("content", ""))
     except httpx.TimeoutException:
         return LLMResult(risk_level="SAFE", reason="LLM 타임아웃", triggered_message=None)
     except Exception as e:
