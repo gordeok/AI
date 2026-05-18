@@ -13,8 +13,6 @@ import io
 import json
 from pathlib import Path
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -134,6 +132,7 @@ def predict(img_path: str, top_k: int = 3):
 
 # ── 실행 ─────────────────────────────────────────────
 if __name__ == "__main__":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
     DEFAULT_IMAGE = r"C:\gordeok-AI\test2.png"
     img_path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_IMAGE
     predict(img_path)
