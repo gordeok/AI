@@ -145,8 +145,7 @@ def main():
     for idx in sorted(total_per_class):
         total   = total_per_class[idx]
         correct = correct_per_class[idx]
-        bar     = "█" * int(correct / total * 20)
-        print(f"  {idx_to_class[idx]:<45} {correct:>2}/{total}  {correct/total*100:5.1f}%  {bar}")
+        print(f"  {idx_to_class[idx]:<45} {correct:>2}/{total}  {correct/total*100:5.1f}%")
 
     overall = total_correct / len(test_samples)
     print("=" * 55)
